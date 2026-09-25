@@ -5,6 +5,7 @@ import re
 import shutil
 import sys
 import time
+from collections.abc import Iterator
 
 from config import GenericConfig, header, trim_margin
 
@@ -32,33 +33,42 @@ class AppConfig(GenericConfig):
         """)
         GenericConfig._print_help(output)
 
-    def parse_option(self, option: str) -> bool:
+    def parse_option(self, option: str, remaining_options: Iterator[str]) -> bool:
         if option == "-o" or option == "--overwrite":
             self.overwrite_existing_files = True
         elif option == "-d":
-            self.custom_date = next(options)
+            if given_date := next(remaining_options, None):
+                self.custom_date = given_date
+            else:
+                raise SystemExit("Please specify a custom date.")
         elif option == "--hidden":
             self.include_hidden_files = True
-        else: return False
+        else:
+            return False
 
         return True
 
 
-if __name__ == "__main__":
-    args = sys.argv[1:]
+def main(args: list[str]) -> int:
+    if not args:
+        AppConfig.print_help()
 
-    if len(args) == 0: AppConfig.print_help()
+    arguments = iter(args)
 
-    options = iter(args)
-    app = AppConfig(options)
-    arguments = args[len(args) - len(list(options)) - 1:]
+    app = AppConfig(arguments)
 
-    if arguments[0] == "CWD":
-        path = os.listdir(os.getcwd())
+    paths: list = []
+
+    if argument := next(arguments, None):
+        if argument == "CWD":
+            paths = os.listdir(os.getcwd())
+        else:
+            paths.append(argument)
+            paths.extend(argument)
     else:
-        path = arguments
+        raise SystemExit("Please specify either file paths or CWD.")
 
-    for file in path:
+    for file in paths:
         file_name = os.path.basename(file)
 
         if file_name.startswith(".") and not app.include_hidden_files:
@@ -71,17 +81,19 @@ if __name__ == "__main__":
             app.log(f"Skipping {file_name}; file not found")
             continue
 
-        if re.match(r"^\d{2}-\d{2}-\d{2} ", file_name):
-            app.log(f"Skipping {file_name}; date already found.")
-            continue
+        prepend_string: str
 
-        prepend_string = app.custom_date
+        if not app.custom_date:
+            if re.match(r"^\d{2}-\d{2}-\d{2} ", file_name):
+                app.log(f"Skipping {file_name}; date already found.")
+                continue
 
-        if prepend_string is None:
             result = os.stat(file_path)
 
             prepend_time = int(min(result.st_atime, result.st_mtime, result.st_ctime))
             prepend_string = time.strftime("%y-%m-%d", time.gmtime(prepend_time))
+        else:
+            prepend_string = app.custom_date
 
         new_file_path = os.path.join(os.path.dirname(file_path), f"{prepend_string} {file_name}")
 
@@ -96,3 +108,11 @@ if __name__ == "__main__":
         app.log(f"Renaming '{file_name}' to '{prepend_string} {file_name}'")
 
         os.replace(file_path, new_file_path)
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(
+        main(sys.argv[1:])
+    )

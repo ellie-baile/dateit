@@ -2,7 +2,6 @@
 # Created: 19-03-2026
 import os
 import re
-import sys
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from enum import StrEnum
@@ -28,7 +27,9 @@ class GenericConfig(ABC):
                 GenericConfig.print_help()
             elif option == "-v" or option == "--verbose":
                 self.verbose_output = True
-            elif self.parse_option(option):
+            elif option == "--":
+                break
+            elif self.parse_option(option, options):
                 continue
             else: break
 
@@ -36,14 +37,14 @@ class GenericConfig(ABC):
     def _print_help(output: str):
         os.system("")  # Hack to enable coloured output on Windows.
         print(output)
-        sys.exit(0)
+        raise SystemExit(0)
 
     @classmethod
     @abstractmethod
     def print_help(cls):
         pass
 
-    def parse_option(self, option: str) -> bool:
+    def parse_option(self, option: str, remaining_options: Iterator[str]) -> bool:
         return False
 
     def log(self, message: str):
