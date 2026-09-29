@@ -22,10 +22,12 @@ def prefix_path_name(path: Path, prefix: str) -> Path:
 
 
 def parse_date(date: str) -> str:
-    if re.match(r"^\d{2}-\d{2}-\d{2}$", date):
-        return date
-    else:
+    try:
+        time.strptime(date, "%y-%m-%d")
+    except ValueError:
         raise argparse.ArgumentTypeError("Invalid date format")
+
+    return date
 
 
 def main(
