@@ -2,9 +2,8 @@
 # Created: 19-03-2026
 import argparse
 import re
-import shutil
 import time
-from collections.abc import Iterator
+from collections.abc import Iterable
 from pathlib import Path
 
 
@@ -31,7 +30,7 @@ def parse_date(date: str) -> str:
 
 
 def main(
-    paths: Iterator[Path],
+    paths: Iterable[Path],
     verbose: bool = False,
     include_hidden_files: bool = False,
     custom_date: str | None = None,
@@ -64,6 +63,7 @@ def main(
 
         if new_file_path.exists():
             print(f"Error: Skipping {path}; renamed file exists.")
+            continue
 
 
         path.replace(new_file_path)
