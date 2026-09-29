@@ -33,7 +33,6 @@ def parse_date(date: str) -> str:
 def main(
     paths: Iterator[Path],
     verbose: bool = False,
-    overwrite_existing_files: bool = False,
     include_hidden_files: bool = False,
     custom_date: str | None = None,
 ) -> int:
@@ -64,12 +63,7 @@ def main(
         new_file_path = prefix_path_name(path, prepend_string)
 
         if new_file_path.exists():
-            if not overwrite_existing_files:
-                log(f"Skipping {path}; renamed file exists.")
-                continue
-
-            if new_file_path.is_dir():
-                shutil.rmtree(new_file_path)
+            log(f"Skipping {path}; renamed file exists.")
 
 
         path.replace(new_file_path)
@@ -85,19 +79,14 @@ if __name__ == "__main__":
     )
     parser.add_argument("paths", nargs="*", metavar="FILES", type=Path)
     parser.add_argument("-v", "--verbose", action="store_true", help="Output extra information", dest="verbose")
-    parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite files that already exist",
-                        dest="overwrite_existing_files")
-    parser.add_argument("-d", "--date", metavar="DATE", type=parse_date, help="A custom date to prepend (YY-MM-DD)",
-                        dest="date")
-    parser.add_argument("--hidden", action="store_true", help="Also prepend dates to hidden files",
-                        dest="include_hidden_files")
+    parser.add_argument("-d", "--date", metavar="DATE", type=parse_date, help="A custom date to prepend (YY-MM-DD)", dest="date")
+    parser.add_argument("--hidden", action="store_true", help="Also prepend dates to hidden files", dest="include_hidden_files")
     arguments = parser.parse_args()
 
     raise SystemExit(
         main(
             paths = arguments.paths or Path.cwd().iterdir(),
             verbose = arguments.verbose,
-            overwrite_existing_files = arguments.overwrite_existing_files,
             include_hidden_files = arguments.include_hidden_files,
             custom_date = arguments.date
         )
