@@ -50,13 +50,13 @@ def main(
 
         prepend_string: str
 
+        if re.match(r"^\.?\d{2}-\d{2}-\d{2}", path.name):
+            log(f"Skipping {path}; date already present.")
+            continue
+
         if custom_date:
             prepend_string = custom_date
         else:
-            if re.match(r"^\.?\d{2}-\d{2}-\d{2}", path.name):
-                log(f"Skipping {path}; date already present.")
-                continue
-
             prepend_string = time.strftime("%y-%m-%d", get_file_creation_time(path))
 
         new_file_path = prefix_path_name(path, prepend_string)
