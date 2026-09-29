@@ -2,15 +2,35 @@
 # Created: 19-03-2026
 import argparse
 import re
+import sys
 import time
 from collections.abc import Iterable
 from pathlib import Path
 
 
-def get_file_creation_time(path: Path) -> time.struct_time:
-    result = path.stat()
+class Logger:
+    def __init__(self, verbose: bool) -> None:
+        self.verbose: bool = verbose
+        self.errors: int = 0
 
-    return time.gmtime(int(min(result.st_atime, result.st_mtime, result.st_ctime)))
+    def info(self, message: str) -> None:
+        if self.verbose:
+            print(message)
+
+    def error(self, message: str) -> None:
+        print("Error: " + message, file=sys.stderr)
+        self.errors += 1
+
+    def has_errored(self) -> bool:
+        return self.errors > 0
+
+
+def get_file_creation_time(path: Path) -> time.struct_time | None:
+    try:
+        result = path.stat()
+        return time.gmtime(int(min(result.st_atime, result.st_mtime, result.st_ctime)))
+    except OSError:
+        return None
 
 
 def prefix_path_name(path: Path, prefix: str) -> Path:
@@ -35,41 +55,45 @@ def main(
     include_hidden_files: bool = False,
     custom_date: str | None = None,
 ) -> int:
-    def log(message: str):
-        if verbose:
-            print(message)
+    logger = Logger(verbose)
 
     for path in paths:
         if not path.exists():
-            print(f"Error: Skipping {path}; doesn't exist.")
+            logger.error(f"Skipping {path}; doesn't exist.")
             continue
 
         if path.name.startswith(".") and not include_hidden_files:
-            log(f"Skipping {path}; it's hidden.")
+            logger.info(f"Skipping {path}; it's hidden.")
             continue
 
         prepend_string: str
 
         if re.match(r"^\.?\d{2}-\d{2}-\d{2}", path.name):
-            log(f"Skipping {path}; date already present.")
+            logger.info(f"Skipping {path}; date already present.")
             continue
 
         if custom_date:
             prepend_string = custom_date
         else:
-            prepend_string = time.strftime("%y-%m-%d", get_file_creation_time(path))
+            if creation_time := get_file_creation_time(path):
+                prepend_string = time.strftime("%y-%m-%d", creation_time)
+            else:
+                logger.error(f"Skipping {path}; cannot determine creation date.")
+                continue
 
         new_file_path = prefix_path_name(path, prepend_string)
 
         if new_file_path.exists():
-            print(f"Error: Skipping {path}; renamed file exists.")
+            logger.error(f"Skipping {path}; renamed file exists.")
             continue
 
+        try:
+            path.replace(new_file_path)
+            logger.info(f"Renamed '{path.name}' to '{new_file_path.name}'")
+        except OSError as exception:
+            logger.error(f"Skipping {path}; {exception}")
 
-        path.replace(new_file_path)
-        log(f"Renamed '{path.name}' to '{new_file_path.name}'")
-
-    return 0
+    return 1 if logger.has_errored() else 0
 
 
 if __name__ == "__main__":
