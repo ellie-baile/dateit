@@ -42,7 +42,7 @@ def main(
 
     for path in paths:
         if not path.exists():
-            log(f"Skipping {path}; doesn't exist.")
+            print(f"Error: Skipping {path}; doesn't exist.")
             continue
 
         if path.name.startswith(".") and not include_hidden_files:
@@ -63,7 +63,7 @@ def main(
         new_file_path = prefix_path_name(path, prepend_string)
 
         if new_file_path.exists():
-            log(f"Skipping {path}; renamed file exists.")
+            print(f"Error: Skipping {path}; renamed file exists.")
 
 
         path.replace(new_file_path)
