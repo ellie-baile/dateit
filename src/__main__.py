@@ -16,9 +16,9 @@ def get_file_creation_time(path: Path) -> time.struct_time:
 
 def prefix_path_name(path: Path, prefix: str) -> Path:
     if path.name.startswith("."):
-        return path.with_name(f".{prefix}{path.name[1:]}")
+        return path.with_name(f".{prefix} {path.name[1:]}")
     else:
-        return path.with_name(f"{prefix}{path.name}")
+        return path.with_name(f"{prefix} {path.name}")
 
 
 def parse_date(date: str) -> str:
@@ -53,7 +53,7 @@ def main(
         if custom_date:
             prepend_string = custom_date
         else:
-            if re.match(r"^\.?\d{2}-\d{2}-\d{2} ", path.name):
+            if re.match(r"^\.?\d{2}-\d{2}-\d{2}", path.name):
                 log(f"Skipping {path}; date already present.")
                 continue
 

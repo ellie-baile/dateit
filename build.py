@@ -22,7 +22,7 @@ def create_compiled(source_path: str, target_file: str) -> None:
         contents = output.read()
         output.seek(0, os.SEEK_SET)
         output.truncate()
-        output.write(b"#!/usr/bin/env python" + contents)
+        output.write(b"#!/usr/bin/env python\n" + contents)
 
     # Make the file executable.
     os.chmod(target_file, os.stat(target_file).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
