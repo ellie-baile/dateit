@@ -46,7 +46,6 @@ def create_zip_app(source_path: Path, target_file: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        usage="%(prog)s [OPTIONS]",
         description="Creates a zip app, optionally compiling the code."
     )
     parser.add_argument("-c", "--compiled", action="store_true", help="Compile the python code", dest="compiled")
