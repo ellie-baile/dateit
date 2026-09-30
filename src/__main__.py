@@ -82,7 +82,7 @@ def main(
             logger.error(f"Skipping {path}; it's not a file or directory.")
             continue
 
-        if path == Path(".") or path == Path(".."):
+        if path.name in ["", ".", ".."]:
             logger.error(f"Skipping {path}; it's special.")
             continue
 
