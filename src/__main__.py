@@ -38,13 +38,6 @@ def guess_creation_time(path: Path) -> time.struct_time | None:
         return None
 
 
-def is_hidden(path: Path) -> bool:
-    if path.name.startswith("."):
-        return True
-
-    return sys.platform == "win32" and bool(path.stat().st_file_attributes & stat.FILE_ATTRIBUTE_HIDDEN)
-
-
 def prefix_path_name(path: Path, prefix: str) -> Path:
     if path.name.startswith("."):
         return path.with_name(f".{prefix} {path.name[1:]}")
@@ -63,12 +56,9 @@ def parse_date(date: str) -> str:
 
 def main(
     paths: Iterable[Path],
-    verbose: bool = False,
-    include_hidden_paths: bool = False,
+    logger: Logger,
     custom_date: str | None = None,
 ) -> int:
-    logger = Logger(verbose)
-
     for path in paths:
         if not path.exists(follow_symlinks=False):
             logger.error(f"Skipping {path}; doesn't exist.")
@@ -82,18 +72,9 @@ def main(
             logger.error(f"Skipping {path}; it's not a file or directory.")
             continue
 
-        if path.name in ["", ".", ".."]:
+        if path.name in ["", ".."]:
             logger.error(f"Skipping {path}; it's special.")
             continue
-
-        if not include_hidden_paths:
-            try:
-                if is_hidden(path):
-                    logger.info(f"Skipping {path}; it's hidden.")
-                    continue
-            except OSError as exception:
-                logger.error(f"Skipping {path}; Cannot determine hidden status: {exception}")
-                continue
 
         if re.match(r"^\.?\d{2}-\d{2}-\d{2} ", path.name):
             logger.info(f"Skipping {path}; date already present.")
@@ -125,22 +106,47 @@ def main(
     return 1 if logger.has_errored() else 0
 
 
+def is_hidden(path: Path) -> bool:
+    if path.name.startswith("."):
+        return True
+
+    return sys.platform == "win32" and bool(path.stat(follow_symlinks=False).st_file_attributes & stat.FILE_ATTRIBUTE_HIDDEN)
+
+
+def should_include_path(path: Path, logger: Logger) -> bool:
+    try:
+        if not is_hidden(path):
+            return True
+
+        logger.info(f"Skipping {path}; it's hidden.")
+        return False
+    except OSError:
+        logger.error(f"Skipping {path}; cannot determine if hidden.")
+        return False
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        prog="dateit",
-        description="Tries to guess the path creation date and add it to the start of the filename."
-    )
+    parser = argparse.ArgumentParser(description="Tries to guess the path creation date and add it to the start of the filename.")
     parser.add_argument("paths", nargs="*", metavar="PATHS", type=Path)
     parser.add_argument("-v", "--verbose", action="store_true", help="Output extra information", dest="verbose")
     parser.add_argument("-d", "--date", metavar="DATE", type=parse_date, help="A custom date to prepend (YY-MM-DD)", dest="date")
-    parser.add_argument("--hidden", action="store_true", help="Also prepend dates to hidden paths", dest="include_hidden_paths")
+    parser.add_argument("--hidden", action="store_true", help="Also prepend dates to hidden paths when no paths are given.", dest="include_hidden_paths")
     arguments = parser.parse_args()
+
+    logger = Logger(arguments.verbose)
+
+    paths = arguments.paths
+
+    if not paths:
+        paths = Path.cwd().iterdir()
+
+        if not arguments.include_hidden_paths:
+            paths = filter(lambda path: should_include_path(path, logger), paths)
 
     raise SystemExit(
         main(
-            paths=arguments.paths or Path.cwd().iterdir(),
-            verbose=arguments.verbose,
-            include_hidden_paths=arguments.include_hidden_paths,
+            paths=paths,
+            logger=logger,
             custom_date=arguments.date
         )
     )
