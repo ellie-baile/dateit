@@ -127,7 +127,7 @@ def main(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        usage="%(prog)s [OPTIONS] PATHS...",
+        prog="dateit",
         description="Tries to guess the path creation date and add it to the start of the filename."
     )
     parser.add_argument("paths", nargs="*", metavar="PATHS", type=Path)
