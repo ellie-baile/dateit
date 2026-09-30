@@ -1,5 +1,5 @@
 [tool.pyright]
-include = [ "src" ]
+include = [ "src", "build.py" ]
 exclude = [ "**/__pycache__" ]
 
 pythonVersion = "3.14"

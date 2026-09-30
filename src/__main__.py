@@ -2,6 +2,7 @@
 # Created: 19-03-2026
 import argparse
 import re
+import stat
 import sys
 import time
 from collections.abc import Iterable
@@ -11,7 +12,7 @@ from pathlib import Path
 class Logger:
     def __init__(self, verbose: bool) -> None:
         self.verbose: bool = verbose
-        self.errors: int = 0
+        self.errored: bool = False
 
     def info(self, message: str) -> None:
         if self.verbose:
@@ -19,25 +20,35 @@ class Logger:
 
     def error(self, message: str) -> None:
         print("Error: " + message, file=sys.stderr)
-        self.errors += 1
+        self.errored = True
 
     def has_errored(self) -> bool:
-        return self.errors > 0
+        return self.errored
 
 
-def get_file_creation_time(path: Path) -> time.struct_time | None:
+def guess_creation_time(path: Path) -> time.struct_time | None:
     try:
         result = path.stat()
-        return time.gmtime(int(min(result.st_atime, result.st_mtime, result.st_ctime)))
+
+        if hasattr(result, "st_birthtime"):
+            return time.localtime(result.st_birthtime)
+
+        return time.localtime(min(result.st_atime, result.st_mtime, result.st_ctime))
     except OSError:
         return None
 
 
+def is_hidden(path: Path) -> bool:
+    if path.name.startswith("."):
+        return True
+
+    return sys.platform == "win32" and bool(path.stat().st_file_attributes & stat.FILE_ATTRIBUTE_HIDDEN)
+
 def prefix_path_name(path: Path, prefix: str) -> Path:
     if path.name.startswith("."):
         return path.with_name(f".{prefix} {path.name[1:]}")
-    else:
-        return path.with_name(f"{prefix} {path.name}")
+
+    return path.with_name(f"{prefix} {path.name}")
 
 
 def parse_date(date: str) -> str:
@@ -45,51 +56,55 @@ def parse_date(date: str) -> str:
         parsed_date = time.strptime(date, "%y-%m-%d")
 
         return time.strftime("%y-%m-%d", parsed_date)
-    except ValueError:
-        raise argparse.ArgumentTypeError("Invalid date format")
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("Invalid date format") from error
 
 
 def main(
     paths: Iterable[Path],
     verbose: bool = False,
-    include_hidden_files: bool = False,
+    include_hidden_paths: bool = False,
     custom_date: str | None = None,
 ) -> int:
     logger = Logger(verbose)
 
     for path in paths:
-        if not path.exists():
+        if not path.exists(follow_symlinks=False):
             logger.error(f"Skipping {path}; doesn't exist.")
             continue
 
-        if path.name.startswith(".") and not include_hidden_files:
+        if path.is_symlink() or path.is_junction():
+            logger.info(f"Skipping {path}; it's a link.")
+            continue
+
+        if is_hidden(path) and not include_hidden_paths:
             logger.info(f"Skipping {path}; it's hidden.")
+            continue
+
+        if re.match(r"^\.?\d{2}-\d{2}-\d{2} ", path.name):
+            logger.info(f"Skipping {path}; date already present.")
             continue
 
         prepend_string: str
 
-        if re.match(r"^\.?\d{2}-\d{2}-\d{2}", path.name):
-            logger.info(f"Skipping {path}; date already present.")
-            continue
-
         if custom_date:
             prepend_string = custom_date
         else:
-            if creation_time := get_file_creation_time(path):
+            if creation_time := guess_creation_time(path):
                 prepend_string = time.strftime("%y-%m-%d", creation_time)
             else:
                 logger.error(f"Skipping {path}; cannot determine creation date.")
                 continue
 
-        new_file_path = prefix_path_name(path, prepend_string)
+        new_path = prefix_path_name(path, prepend_string)
 
-        if new_file_path.exists():
-            logger.error(f"Skipping {path}; renamed file exists.")
+        if new_path.exists(follow_symlinks=False):
+            logger.error(f"Skipping {path}; renamed path exists.")
             continue
 
         try:
-            path.replace(new_file_path)
-            logger.info(f"Renamed '{path.name}' to '{new_file_path.name}'")
+            path.replace(new_path)
+            logger.info(f"Renamed '{path.name}' to '{new_path.name}'")
         except OSError as exception:
             logger.error(f"Skipping {path}; {exception}")
 
@@ -98,20 +113,20 @@ def main(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        usage="%(prog) [OPTIONS] FILES...",
-        description="Tries to guess the file creation date and add it to the start of the filename."
+        usage="%(prog)s [OPTIONS] PATHS...",
+        description="Tries to guess the path creation date and add it to the start of the filename."
     )
-    parser.add_argument("paths", nargs="*", metavar="FILES", type=Path)
+    parser.add_argument("paths", nargs="*", metavar="PATHS", type=Path)
     parser.add_argument("-v", "--verbose", action="store_true", help="Output extra information", dest="verbose")
     parser.add_argument("-d", "--date", metavar="DATE", type=parse_date, help="A custom date to prepend (YY-MM-DD)", dest="date")
-    parser.add_argument("--hidden", action="store_true", help="Also prepend dates to hidden files", dest="include_hidden_files")
+    parser.add_argument("--hidden", action="store_true", help="Also prepend dates to hidden paths", dest="include_hidden_paths")
     arguments = parser.parse_args()
 
     raise SystemExit(
         main(
-            paths = arguments.paths or Path.cwd().iterdir(),
-            verbose = arguments.verbose,
-            include_hidden_files = arguments.include_hidden_files,
-            custom_date = arguments.date
+            paths=arguments.paths or Path.cwd().iterdir(),
+            verbose=arguments.verbose,
+            include_hidden_paths=arguments.include_hidden_paths,
+            custom_date=arguments.date
         )
     )
