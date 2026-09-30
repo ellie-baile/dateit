@@ -42,10 +42,7 @@ def is_hidden(path: Path) -> bool:
     if path.name.startswith("."):
         return True
 
-    try:
-        return sys.platform == "win32" and bool(path.stat().st_file_attributes & stat.FILE_ATTRIBUTE_HIDDEN)
-    except OSError:
-        return False
+    return sys.platform == "win32" and bool(path.stat().st_file_attributes & stat.FILE_ATTRIBUTE_HIDDEN)
 
 
 def prefix_path_name(path: Path, prefix: str) -> Path:
@@ -77,17 +74,25 @@ def main(
             logger.error(f"Skipping {path}; doesn't exist.")
             continue
 
-        if not path.is_file(follow_symlinks=False) and not path.is_dir(follow_symlinks=False):
-            logger.error(f"Skipping {path}; it's not a file or directory.")
-            continue
-
         if path.is_symlink() or path.is_junction():
             logger.info(f"Skipping {path}; it's a link.")
             continue
 
-        if not include_hidden_paths and is_hidden(path):
-            logger.info(f"Skipping {path}; it's hidden.")
+        if not path.is_file(follow_symlinks=False) and not path.is_dir(follow_symlinks=False):
+            logger.error(f"Skipping {path}; it's not a file or directory.")
             continue
+
+        if path == Path(".") or path == Path(".."):
+            logger.error(f"Skipping {path}; it's special.")
+
+        if not include_hidden_paths:
+            try:
+                if is_hidden(path):
+                    logger.info(f"Skipping {path}; it's hidden.")
+                    continue
+            except OSError as exception:
+                logger.error(f"Skipping {path}; Cannot determine hidden status: {exception}")
+                continue
 
         if re.match(r"^\.?\d{2}-\d{2}-\d{2} ", path.name):
             logger.info(f"Skipping {path}; date already present.")
