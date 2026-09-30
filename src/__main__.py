@@ -84,6 +84,7 @@ def main(
 
         if path == Path(".") or path == Path(".."):
             logger.error(f"Skipping {path}; it's special.")
+            continue
 
         if not include_hidden_paths:
             try:
