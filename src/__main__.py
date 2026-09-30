@@ -42,7 +42,11 @@ def is_hidden(path: Path) -> bool:
     if path.name.startswith("."):
         return True
 
-    return sys.platform == "win32" and bool(path.stat().st_file_attributes & stat.FILE_ATTRIBUTE_HIDDEN)
+    try:
+        return sys.platform == "win32" and bool(path.stat().st_file_attributes & stat.FILE_ATTRIBUTE_HIDDEN)
+    except OSError:
+        return False
+
 
 def prefix_path_name(path: Path, prefix: str) -> Path:
     if path.name.startswith("."):
@@ -73,11 +77,15 @@ def main(
             logger.error(f"Skipping {path}; doesn't exist.")
             continue
 
+        if not path.is_file(follow_symlinks=False) and not path.is_dir(follow_symlinks=False):
+            logger.error(f"Skipping {path}; it's not a file or directory.")
+            continue
+
         if path.is_symlink() or path.is_junction():
             logger.info(f"Skipping {path}; it's a link.")
             continue
 
-        if is_hidden(path) and not include_hidden_paths:
+        if not include_hidden_paths and is_hidden(path):
             logger.info(f"Skipping {path}; it's hidden.")
             continue
 
