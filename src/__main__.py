@@ -130,11 +130,10 @@ if __name__ == "__main__":
     parser.add_argument("paths", nargs="*", metavar="PATHS", type=Path)
     parser.add_argument("-v", "--verbose", action="store_true", help="Output extra information", dest="verbose")
     parser.add_argument("-d", "--date", metavar="DATE", type=parse_date, help="A custom date to prepend (YY-MM-DD)", dest="date")
-    parser.add_argument("--hidden", action="store_true", help="Also prepend dates to hidden paths when no paths are given.", dest="include_hidden_paths")
+    parser.add_argument("--hidden", action="store_true", help="Also prepend dates to hidden paths when no paths are given", dest="include_hidden_paths")
     arguments = parser.parse_args()
 
     logger = Logger(arguments.verbose)
-
     paths = arguments.paths
 
     if not paths:
